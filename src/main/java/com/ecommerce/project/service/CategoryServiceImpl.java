@@ -4,6 +4,10 @@ import java.util.List;
 
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import com.ecommerce.project.exception.APIException;
@@ -28,14 +32,23 @@ public class CategoryServiceImpl implements CategoryService {
 	}
 
 	@Override
-	public CategoryResponse getAllCategories() {
-		List<Category> categories = categoryRepository.findAll();
+	public CategoryResponse getAllCategories(Integer pageNumber,Integer pageSize,String sortBy,String sortDir) {
+		Sort sortByAndDir=sortDir.equalsIgnoreCase("asc")?Sort.by(sortBy).ascending():Sort.by(sortBy).descending();
+		Pageable pageable = PageRequest.of(pageNumber,pageSize,sortByAndDir);
+		 Page<Category> categoryPage = categoryRepository.findAll(pageable);
+		 List<Category> categories = categoryPage.getContent();
 		if (categories.isEmpty())
 			throw new APIException("No category created till now");
 		List<CategoryDto> list = categories.stream().map(category -> modelMapper.map(category, CategoryDto.class))
 				.toList();
 		CategoryResponse categoryResponse = new CategoryResponse();
 		categoryResponse.setContent(list);
+		categoryResponse.setPageNumber(categoryPage.getNumber());
+		categoryResponse.setPageSize(categoryPage.getSize());
+		categoryResponse.setTotalPages(categoryPage.getTotalPages());
+		categoryResponse.setTotalElements(categoryPage.getTotalElements());
+		categoryResponse.setLastPage(categoryPage.isLast());
+		categoryResponse.setPreviousPage(categoryPage.hasPrevious());
 		return categoryResponse;
 	}
 
@@ -55,7 +68,7 @@ public class CategoryServiceImpl implements CategoryService {
 	}
 
 	@Override
-	public String deleteCategory(Long categoryId) {
+	public CategoryDto deleteCategory(Long categoryId) {
 		/*
 		 * Category category = categories.stream().filter(c ->
 		 * c.getCategoryId().equals(categoryId)).findFirst() .orElseThrow(() -> new
@@ -67,7 +80,7 @@ public class CategoryServiceImpl implements CategoryService {
 		Category category = categoryRepository.findById(categoryId)
 				.orElseThrow(() -> new ResourceNotFoundException("Category", "categoryId", categoryId));
 		categoryRepository.delete(category);
-		return "Category with the categoryId " + categoryId + " is deleted successfully";
+		return modelMapper.map(category, CategoryDto.class);
 	}
 
 	@Override
